@@ -644,7 +644,7 @@ void StartDispTask(void const * argument)
 			}
 			if(func_switch==1){
 					GUI_DispStringAt("MPU6050×ËÌ¬½Ç", 0, 0);
-					sprintf(buf, "\n¸©Ñö½Ç:%6.1f¡ã\nºá¹ö½Ç:%6.1f¡ã\nº½Ïò½Ç:%6.1f¡ã", fAX, fAY, fAZ);
+					sprintf(buf, "\n\n¸©Ñö½Ç:%6.1f¡ã\nºá¹ö½Ç:%6.1f¡ã\nº½Ïò½Ç:%6.1f¡ã", fAX, fAY, fAZ);
 
 			}
 		
