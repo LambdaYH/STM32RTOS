@@ -69,6 +69,9 @@ uint16_t adval=0;
 int page_sta=0;
 uint8_t Ledsta =0;
 uint8_t LED_flowflag=0;
+
+int start_sig=0;
+int func_in=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -502,9 +505,8 @@ void StartDefaultTask(void const * argument)
   for(;;) {
 	if (rxit_ok != HAL_OK)		// 如果串口1接收中断还没有启动，尝试再次启动
 		rxit_ok = HAL_UART_Receive_IT(&huart1, pBuf, 1);
-	if (mpuok) 
-		MPU_getdata();
-	osDelay(10);
+	if (mpuok) MPU_getdata();
+	osDelay(1);
 	}
   /* USER CODE END 5 */ 
 }
@@ -568,7 +570,7 @@ void StartTKeyTask(void const * argument)
 void StartDispTask(void const * argument)
 {
   /* USER CODE BEGIN StartDispTask */
-	char buf[200];
+	char buf[100];
 	GUI_Init();
   GUI_SetFont(&GUI_FontHZ_SimSun_12);
 	GUI_Clear();
@@ -577,8 +579,7 @@ void StartDispTask(void const * argument)
 	GUI_DispStringAt("陈逸航",45,40);
 	GUI_Update();
 	HAL_Delay(1000);
-	int start_sig=0;
-	int func_in=0;
+	
   /* Infinite loop */
   for(;;)
   {
@@ -608,40 +609,46 @@ void StartDispTask(void const * argument)
 			osDelay(300);
 		}
 		if(K3_sta&start_sig&func_in==0){
-			switch(func_switch){
-				case 0:sprintf(buf,"系统测试\nTODO");break;
-				case 1:sprintf(buf,"陀螺仪姿态解算\nTODO");break;
-				case 2:sprintf(buf,"串口通信测试\nTODO");break;
-				case 3:sprintf(buf,"WIFI通信测试\nTODO");break;
-				default:sprintf(buf,"error");break;
-				}
 			func_in=1;
 			osDelay(300);
 		}
 		if(K4_sta&start_sig){
 			sprintf(buf,"基于STM32的无线节点\n\n->系统测试\n  陀螺仪姿态解算\n  串口通信测试\n  WIFI通信测试\n");
 			func_in=0;
+			func_switch=0;
+			page_sta=0;
 		}
 		if(func_in&start_sig){
 			if(func_switch==0){
 				if(K1_sta) page_sta=0;
 				if(K2_sta) page_sta=1;
 				if(page_sta==0){
-					sprintf(buf,"K1%s K2%s K3%s K4%s\n\nL1%s L2%s L3%s L4:%s\nADC:%d",K1_sta ? "▁" : "▅",K2_sta ? "▁" : "▅",K3_sta ? "▁" : "▅",K4_sta ? "▁" : "▅",
+					GUI_DispStringAt("按键|LED|ADC状态",0,0);
+					sprintf(buf,"\n\nK1%s K2%s K3%s K4%s\nL1%s L2%s L3%s L4:%s\nADC:%d",K1_sta ? "▁" : "▅",K2_sta ? "▁" : "▅",K3_sta ? "▁" : "▅",K4_sta ? "▁" : "▅",
 					(HAL_GPIO_ReadPin(LED1_GPIO_Port,LED1_Pin) == GPIO_PIN_RESET)?"●" : "○",
 					(HAL_GPIO_ReadPin(LED2_GPIO_Port,LED2_Pin) == GPIO_PIN_RESET)?"●" : "○",
 					(HAL_GPIO_ReadPin(LED3_GPIO_Port,LED3_Pin) == GPIO_PIN_RESET)?"●" : "○",
 					(HAL_GPIO_ReadPin(LED4_GPIO_Port,LED4_Pin) == GPIO_PIN_RESET)?"●" : "○",
 					adval);
 				}else{
-					sprintf(buf, "ax:%6d gx:%6d\n\nay:%6d gy:%6d\naz:%6d gz:%6d", ax, gx, ay, gy, az, gz);
+					GUI_DispStringAt("陀螺仪原始数据",0,0);
+					sprintf(buf, "\n\nax:%6d gx:%6d\nay:%6d gy:%6d\naz:%6d gz:%6d", ax, gx, ay, gy, az, gz);
 				}
 				if(K3_sta==1) {
 					LED_flowflag=!LED_flowflag;
 					osDelay(300);
 				}
+				char t[20];
+				sprintf(t,"%d/2",page_sta+1);
+				GUI_DispStringAt(t,110,0);			//页码显示
 			}
-		}
+			if(func_switch==1){
+					GUI_DispStringAt("MPU6050姿态角", 0, 0);
+					sprintf(buf, "\n俯仰角:%6.1f°\n横滚角:%6.1f°\n航向角:%6.1f°", fAX, fAY, fAZ);
+
+			}
+		
+	}
 
 		if(start_sig==0){
 			GUI_DrawBitmap(&bmAvatar_Invert,0,0);
