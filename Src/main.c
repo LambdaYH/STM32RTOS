@@ -21,11 +21,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "GUI.h"
-#include "MPU6050.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "GUI.h"
+#include "MPU6050.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,6 +44,9 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
+
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
@@ -59,25 +62,110 @@ uint8_t K2_sta =0;
 uint8_t K3_sta =0;
 uint8_t K4_sta =0;
 uint8_t func_switch=1;
+int mpuok = 0;
+uint8_t style = 0;
+uint16_t val[20];
+uint16_t adval=0;
+int page_sta=0;
+uint8_t Ledsta =0;
+uint8_t Leddir=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_ADC1_Init(void);
 void StartDefaultTask(void const * argument);
 void StartTKeyTask(void const * argument);
 void StartDispTask(void const * argument);
 void StartLedTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
-
+#define MAX_RECV_LEN 128
+uint8_t rx1_buff[MAX_RECV_LEN] = {0};  // 串口接收数据缓冲
+uint8_t * pBuf = rx1_buff;  // 当前接收字节存放位置指针
+uint8_t line_flag = 0;      // 一行数据接收标志
+HAL_StatusTypeDef rxit_ok; 	// 接收中断是否开启
+uint8_t rx2_buff[MAX_RECV_LEN] = {0};  // 串口接收数据缓冲
+uint8_t * pBuf2 = rx2_buff; // 当前接收字节存放位置指针
+uint8_t line_flag2 = 0;     // 一行数据接收标志
+HAL_StatusTypeDef rxit_ok2; // 接收中断是否开启
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+int fputc(int ch, FILE *f) {
+    HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, 0xffff); // 向串口1发送一个字符
+    return 0;
+}
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+{
+  int i;
+  uint16_t sum = 0;
+  for (i = 0; i < 20; ++i)
+    sum += val[i];
+  adval = sum / 20;
+}
+//LED SET BEGIN 
+void setLEDS(uint8_t sta){
+	HAL_GPIO_WritePin(LED1_GPIO_Port,LED1_Pin,(sta & 0x01)?GPIO_PIN_RESET:GPIO_PIN_SET);
+	HAL_GPIO_WritePin(LED2_GPIO_Port,LED2_Pin,(sta & 0x02)?GPIO_PIN_RESET:GPIO_PIN_SET);
+	HAL_GPIO_WritePin(LED3_GPIO_Port,LED3_Pin,(sta & 0x04)?GPIO_PIN_RESET:GPIO_PIN_SET);
+	HAL_GPIO_WritePin(LED4_GPIO_Port,LED4_Pin,(sta & 0x08)?GPIO_PIN_RESET:GPIO_PIN_SET);
+}
+// LED SET END
+void RunLsd(void)
+{
+  setLEDS(Ledsta);
+  
+  if (Leddir)
+  {
+    Ledsta >>= 1;
+    if (0 == Ledsta)
+      Ledsta = 0x08;
+  }
+  else
+  {
+    Ledsta <<= 1;
+    if (Ledsta > 0x08)
+      Ledsta = 0x01;
+  }
+}
+//接收中断回调函数
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
+  uint8_t cnt = 0; // 临时变量，用于重复计数
+  if (UartHandle->Instance == USART1)
+  {
+    ++ pBuf;  // 已接收一个字节数据，当前存储位置指针后移
+    if(pBuf == rx1_buff + MAX_RECV_LEN)  // 如果指针已移出数组边界
+        pBuf = rx1_buff;    // 重新指向数组开头
+    else if(*(pBuf - 1) == '\n')  // 如果之前接收到‘\n’换行符，则表示接收完成
+        line_flag  = 1;
+    // 重新开启接收中断
+    do {
+        rxit_ok = HAL_UART_Receive_IT(UartHandle, pBuf, 1);
+        if (++cnt >= 5)
+            break;
+    } while(rxit_ok != HAL_OK);
+  }
+  else if(UartHandle->Instance == USART2)
+  {
+    ++ pBuf2;  // 已接收一个字节数据，当前存储位置指针后移
+    if(pBuf2 == rx2_buff + MAX_RECV_LEN)  // 如果指针已移出数组边界
+        pBuf2 = rx2_buff;    // 重新指向数组开头
+    else if(*(pBuf2 - 1) == '\n')  // 如果之前接收到‘\n’换行符，则表示接收完成
+        line_flag2  = 1;
+    // 重新开启接收中断
+    do {
+        rxit_ok2 = HAL_UART_Receive_IT(UartHandle, pBuf2, 1);
+        if (++cnt >= 5)
+            break;
+    } while(rxit_ok2 != HAL_OK);
+  }
+}
 /* USER CODE END 0 */
 
 /**
@@ -109,8 +197,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -176,6 +266,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the CPU, AHB and APB busses clocks 
   */
@@ -203,6 +294,57 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+  /** Common config 
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure Regular Channel 
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_55CYCLES_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -271,6 +413,21 @@ static void MX_USART2_UART_Init(void)
 
 }
 
+/** 
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void) 
+{
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+
+}
+
 /**
   * @brief GPIO Initialization Function
   * @param None
@@ -322,14 +479,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
-/* LED SET BEGIN */
-void setLEDS(uint8_t sta){
-	HAL_GPIO_WritePin(LED1_GPIO_Port,LED1_Pin,(sta & 0x01)?GPIO_PIN_RESET:GPIO_PIN_SET);
-	HAL_GPIO_WritePin(LED2_GPIO_Port,LED2_Pin,(sta & 0x02)?GPIO_PIN_RESET:GPIO_PIN_SET);
-	HAL_GPIO_WritePin(LED3_GPIO_Port,LED3_Pin,(sta & 0x04)?GPIO_PIN_RESET:GPIO_PIN_SET);
-	HAL_GPIO_WritePin(LED4_GPIO_Port,LED4_Pin,(sta & 0x08)?GPIO_PIN_RESET:GPIO_PIN_SET);
-}
-/* LED SET END */
+
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
@@ -345,11 +495,20 @@ void StartDefaultTask(void const * argument)
 {
 
   /* USER CODE BEGIN 5 */
+	HAL_ADCEx_Calibration_Start(&hadc1);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)val, 20);
+  char buf[100];
+	mpuok = MPU_init();
+	if (!mpuok)
+		printf("MPU6050 init error!\n");
   /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+  for(;;) {
+	if (rxit_ok != HAL_OK)		// 如果串口1接收中断还没有启动，尝试再次启动
+		rxit_ok = HAL_UART_Receive_IT(&huart1, pBuf, 1);
+	if (mpuok) 
+		MPU_getdata();
+	osDelay(10);
+	}
   /* USER CODE END 5 */ 
 }
 
@@ -467,9 +626,23 @@ void StartDispTask(void const * argument)
 			func_in=0;
 		}
 		if(func_in&start_sig){
-			char 
-			sprintf(buf,"K1:%d K2:%d K3:%d K4:%d",K1_sta,K2_sta,K3_sta,K4_sta);
+			if(func_switch==0){
+				if(K1_sta) page_sta=0;
+				if(K2_sta) page_sta=1;
+				if(page_sta==0){
+					sprintf(buf,"K1%s K2%s K3%s K4%s\n\nL1%s L2%s L3%s L4:%s\nADC:%d",K1_sta ? "▁" : "▅",K2_sta ? "▁" : "▅",K3_sta ? "▁" : "▅",K4_sta ? "▁" : "▅",
+					(HAL_GPIO_ReadPin(LED1_GPIO_Port,LED1_Pin) == GPIO_PIN_RESET)?"●" : "○",
+					(HAL_GPIO_ReadPin(LED2_GPIO_Port,LED2_Pin) == GPIO_PIN_RESET)?"●" : "○",
+					(HAL_GPIO_ReadPin(LED3_GPIO_Port,LED3_Pin) == GPIO_PIN_RESET)?"●" : "○",
+					(HAL_GPIO_ReadPin(LED4_GPIO_Port,LED4_Pin) == GPIO_PIN_RESET)?"●" : "○",
+					adval);
+				}else{
+					sprintf(buf, "ax:%6d gx:%6d\n\nay:%6d gy:%6d\naz:%6d gz:%6d", ax, gx, ay, gy, az, gz);
+				}
+				if(K3_sta==1) 
+			}
 		}
+
 		if(start_sig==0){
 			GUI_DrawBitmap(&bmAvatar_Invert,0,0);
 		}else{
