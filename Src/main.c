@@ -68,7 +68,7 @@ uint16_t val[20];
 uint16_t adval=0;
 int page_sta=0;
 uint8_t Ledsta =0;
-uint8_t Leddir=0;
+uint8_t LED_flowflag=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -117,23 +117,20 @@ void setLEDS(uint8_t sta){
 	HAL_GPIO_WritePin(LED4_GPIO_Port,LED4_Pin,(sta & 0x08)?GPIO_PIN_RESET:GPIO_PIN_SET);
 }
 // LED SET END
+//流水灯 start
 void RunLsd(void)
 {
   setLEDS(Ledsta);
   
-  if (Leddir)
+  if (LED_flowflag)
   {
     Ledsta >>= 1;
     if (0 == Ledsta)
       Ledsta = 0x08;
-  }
-  else
-  {
-    Ledsta <<= 1;
-    if (Ledsta > 0x08)
-      Ledsta = 0x01;
+		HAL_Delay(100);
   }
 }
+//流水灯 end
 //接收中断回调函数
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
   uint8_t cnt = 0; // 临时变量，用于重复计数
@@ -639,7 +636,10 @@ void StartDispTask(void const * argument)
 				}else{
 					sprintf(buf, "ax:%6d gx:%6d\n\nay:%6d gy:%6d\naz:%6d gz:%6d", ax, gx, ay, gy, az, gz);
 				}
-				if(K3_sta==1) 
+				if(K3_sta==1) {
+					LED_flowflag=!LED_flowflag;
+					osDelay(300);
+				}
 			}
 		}
 
@@ -674,6 +674,7 @@ void StartLedTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+		RunLsd();
     osDelay(1);
   }
   /* USER CODE END StartLedTask */
