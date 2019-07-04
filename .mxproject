@@ -1,7 +1,7 @@
 [PreviousGenFiles]
-HeaderPath=C:/Users/cheny/Desktop/STM32RTOS/Inc
+HeaderPath=C:/Users/cinte/Documents/STM32WORK/STM32RTOS/Inc
 HeaderFiles=stm32f1xx_it.h;stm32f1xx_hal_conf.h;main.h;FreeRTOSConfig.h;
-SourcePath=C:/Users/cheny/Desktop/STM32RTOS/Src
+SourcePath=C:/Users/cinte/Documents/STM32WORK/STM32RTOS/Src
 SourceFiles=stm32f1xx_it.c;stm32f1xx_hal_msp.c;main.c;freertos.c;stm32f1xx_hal_timebase_tim.c;
 
 [PreviousLibFiles]

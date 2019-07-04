@@ -231,7 +231,7 @@ int main(void)
   KeyTaskHandle = osThreadCreate(osThread(KeyTask), NULL);
 
   /* definition and creation of DispTask */
-  osThreadDef(DispTask, StartDispTask, osPriorityIdle, 0, 128);
+  osThreadDef(DispTask, StartDispTask, osPriorityIdle, 0, 256);
   DispTaskHandle = osThreadCreate(osThread(DispTask), NULL);
 
   /* definition and creation of LedTask */
@@ -481,7 +481,46 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+// Function 1 START
+void Func1(char *buf){
+				if(K1_sta) page_sta=0;
+				if(K2_sta) page_sta=1;
+				if(page_sta==0){
+					GUI_DispStringAt("°´¼ü|LED|ADC×´Ì¬",0,0);
+					sprintf(buf,"\n\nK1%s K2%s K3%s K4%s\nL1%s L2%s L3%s L4:%s\nADC:%d",K1_sta ? "¨x" : "¨|",K2_sta ? "¨x" : "¨|",K3_sta ? "¨x" : "¨|",K4_sta ? "¨x" : "¨|",
+					(HAL_GPIO_ReadPin(LED1_GPIO_Port,LED1_Pin) == GPIO_PIN_RESET)?"¡ñ" : "¡ð",
+					(HAL_GPIO_ReadPin(LED2_GPIO_Port,LED2_Pin) == GPIO_PIN_RESET)?"¡ñ" : "¡ð",
+					(HAL_GPIO_ReadPin(LED3_GPIO_Port,LED3_Pin) == GPIO_PIN_RESET)?"¡ñ" : "¡ð",
+					(HAL_GPIO_ReadPin(LED4_GPIO_Port,LED4_Pin) == GPIO_PIN_RESET)?"¡ñ" : "¡ð",
+					adval);
+				}else{
+					GUI_DispStringAt("ÍÓÂÝÒÇÔ­Ê¼Êý¾Ý",0,0);
+					sprintf(buf, "\n\nax:%6d gx:%6d\nay:%6d gy:%6d\naz:%6d gz:%6d", ax, gx, ay, gy, az, gz);
+				}
+				if(K3_sta==1) {
+					LED_flowflag=!LED_flowflag;
+					osDelay(300);
+				}
+				char t[20];
+				sprintf(t,"%d/2",page_sta+1);
+				GUI_DispStringAt(t,110,0);			//Ò³ÂëÏÔÊ¾
+			}
+// Function 1 END
+			
+// Function 2 START
+void Func2(char *buf){
+				if(K1_sta) page_sta=0;
+				if(K2_sta) page_sta=1;
+				switch(page_sta){
+					case 0: GUI_DispStringAt("MPU6050×ËÌ¬½Ç", 0, 0);sprintf(buf, "\n\n¸©Ñö½Ç:%6.1f¡ã\nºá¹ö½Ç:%6.1f¡ã\nº½Ïò½Ç:%6.1f¡ã", fAX, fAY, fAZ);break;
+					case 1: GUI_DispStringAt("ÍÓÂÝÒÇÔ­Ê¼Êý¾Ý",0,0);sprintf(buf, "\n\nax:%6d gx:%6d\nay:%6d gy:%6d\naz:%6d gz:%6d", ax, gx, ay, gy, az, gz);break;
+					default:GUI_DispStringAt("ERROR", 0, 0);
+				}
+				char t[20];
+				sprintf(t,"%d/2",page_sta+1);
+				GUI_DispStringAt(t,110,0);			//Ò³ÂëÏÔÊ¾
+			}	
+// Function 2 END
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -618,36 +657,13 @@ void StartDispTask(void const * argument)
 			func_switch=0;
 			page_sta=0;
 		}
-		if(func_in&start_sig){
-			if(func_switch==0){
-				if(K1_sta) page_sta=0;
-				if(K2_sta) page_sta=1;
-				if(page_sta==0){
-					GUI_DispStringAt("°´¼ü|LED|ADC×´Ì¬",0,0);
-					sprintf(buf,"\n\nK1%s K2%s K3%s K4%s\nL1%s L2%s L3%s L4:%s\nADC:%d",K1_sta ? "¨x" : "¨|",K2_sta ? "¨x" : "¨|",K3_sta ? "¨x" : "¨|",K4_sta ? "¨x" : "¨|",
-					(HAL_GPIO_ReadPin(LED1_GPIO_Port,LED1_Pin) == GPIO_PIN_RESET)?"¡ñ" : "¡ð",
-					(HAL_GPIO_ReadPin(LED2_GPIO_Port,LED2_Pin) == GPIO_PIN_RESET)?"¡ñ" : "¡ð",
-					(HAL_GPIO_ReadPin(LED3_GPIO_Port,LED3_Pin) == GPIO_PIN_RESET)?"¡ñ" : "¡ð",
-					(HAL_GPIO_ReadPin(LED4_GPIO_Port,LED4_Pin) == GPIO_PIN_RESET)?"¡ñ" : "¡ð",
-					adval);
-				}else{
-					GUI_DispStringAt("ÍÓÂÝÒÇÔ­Ê¼Êý¾Ý",0,0);
-					sprintf(buf, "\n\nax:%6d gx:%6d\nay:%6d gy:%6d\naz:%6d gz:%6d", ax, gx, ay, gy, az, gz);
-				}
-				if(K3_sta==1) {
-					LED_flowflag=!LED_flowflag;
-					osDelay(300);
-				}
-				char t[20];
-				sprintf(t,"%d/2",page_sta+1);
-				GUI_DispStringAt(t,110,0);			//Ò³ÂëÏÔÊ¾
-			}
-			if(func_switch==1){
-					GUI_DispStringAt("MPU6050×ËÌ¬½Ç", 0, 0);
-					sprintf(buf, "\n\n¸©Ñö½Ç:%6.1f¡ã\nºá¹ö½Ç:%6.1f¡ã\nº½Ïò½Ç:%6.1f¡ã", fAX, fAY, fAZ);
-
-			}
 		
+		if(func_in&start_sig){
+			switch(func_switch){
+				case 0:Func1(buf);break;
+				case 1:Func2(buf);break;
+				default:Func1(buf);break;
+		}
 	}
 
 		if(start_sig==0){
