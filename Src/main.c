@@ -24,6 +24,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "string.h"
 #include "GUI.h"
 #include "MPU6050.h"
 /* USER CODE END Includes */
@@ -55,8 +56,10 @@ osThreadId KeyTaskHandle;
 osThreadId DispTaskHandle;
 osThreadId LedTaskHandle;
 /* USER CODE BEGIN PV */
+#define MAX_RECV_LEN 128
 extern GUI_FLASH const GUI_FONT GUI_FontHZ_SimSun_12;
 extern GUI_CONST_STORAGE GUI_BITMAP bmAvatar_Invert;
+extern GUI_CONST_STORAGE GUI_BITMAP bmAvatar;
 uint8_t K1_sta =0;
 uint8_t K2_sta =0;
 uint8_t K3_sta =0;
@@ -72,6 +75,13 @@ uint8_t LED_flowflag=0;
 
 int start_sig=0;
 int func_in=0;
+
+char  recv[100];
+int recvtype=0;
+
+int playmode=0;
+int ballx=64;
+int bally=32;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -87,7 +97,6 @@ void StartDispTask(void const * argument);
 void StartLedTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
-#define MAX_RECV_LEN 128
 uint8_t rx1_buff[MAX_RECV_LEN] = {0};  // 串口接收数据缓冲
 uint8_t * pBuf = rx1_buff;  // 当前接收字节存放位置指针
 uint8_t line_flag = 0;      // 一行数据接收标志
@@ -166,6 +175,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
     } while(rxit_ok2 != HAL_OK);
   }
 }
+
 /* USER CODE END 0 */
 
 /**
@@ -202,7 +212,9 @@ int main(void)
   MX_USART2_UART_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-
+	printf("hello PC\n");         
+	rxit_ok = HAL_UART_Receive_IT(&huart1, pBuf, 1); 
+	rxit_ok2 = HAL_UART_Receive_IT(&huart2, pBuf2, 1);  
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -223,7 +235,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 256);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of KeyTask */
@@ -500,6 +512,7 @@ void Func1(char *buf){
 				if(K3_sta==1) {
 					LED_flowflag=!LED_flowflag;
 					osDelay(300);
+			
 				}
 				char t[20];
 				sprintf(t,"%d/2",page_sta+1);
@@ -511,16 +524,46 @@ void Func1(char *buf){
 void Func2(char *buf){
 				if(K1_sta) page_sta=0;
 				if(K2_sta) page_sta=1;
-				switch(page_sta){
+				if(K3_sta==1) playmode = !playmode;
+				if(playmode ==1){
+					sprintf(buf,"%s","");
+				  ballx=(90-fAY)*0.667;
+				  if(ballx<=0)
+				     ballx=0;
+					else if(ballx>=120)
+				     ballx=120;
+					else 
+				     ballx=(90-fAY)*0.667;
+					
+					if(fAX>0){
+						 bally=64-2*fAX/3;
+					}
+					else {
+						 bally=64+2*fAX/3;
+					}
+		      GUI_DispStringAt("●",ballx, bally);
+				  HAL_Delay(10);
+				}
+				if(playmode==0){
+					switch(page_sta){
 					case 0: GUI_DispStringAt("MPU6050姿态角", 0, 0);sprintf(buf, "\n\n俯仰角:%6.1f°\n横滚角:%6.1f°\n航向角:%6.1f°", fAX, fAY, fAZ);break;
 					case 1: GUI_DispStringAt("陀螺仪原始数据",0,0);sprintf(buf, "\n\nax:%6d gx:%6d\nay:%6d gy:%6d\naz:%6d gz:%6d", ax, gx, ay, gy, az, gz);break;
 					default:GUI_DispStringAt("ERROR", 0, 0);
+					}
+					char t[20];
+					sprintf(t,"%d/2",page_sta+1);
+					GUI_DispStringAt(t,110,0);			//页码显示
 				}
-				char t[20];
-				sprintf(t,"%d/2",page_sta+1);
-				GUI_DispStringAt(t,110,0);			//页码显示
 			}	
 // Function 2 END
+			
+// Function 3 START
+void Func3(char *buf){
+			GUI_DispStringAt("串口测试", 0, 0);
+			sprintf(buf, "\n%s", recv);
+			
+}
+// Function 3 END
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -542,6 +585,40 @@ void StartDefaultTask(void const * argument)
 		printf("MPU6050 init error!\n");
   /* Infinite loop */
   for(;;) {
+		if (line_flag) {    // 如果串口1接收到一行数据
+			printf("rx1_rec_data = %s", rx1_buff);        // 打印输出接收内容
+			/////////////////////////////
+			sprintf(recv,"%s",rx1_buff);
+			int j=0;
+			char t[100];
+			for(int i=0;i<strlen(recv)-2;i++){
+				t[j]=recv[i];
+				j++;
+				if(recv[i]=='\n'){
+					memset(t, 0, sizeof(t));
+					j=0;
+				}
+			}
+			recvtype+=strlen(rx1_buff)-2;
+			sprintf(recv, "\nReceive:\n%s\nSize:%d", t, recvtype);
+			memset(t, 0, sizeof(t));
+			// 接收数据处理
+			/////////////////////////////
+			memset(rx1_buff, 0, sizeof(rx1_buff));   // 清空串口1缓存区
+			pBuf = rx1_buff;// 重新将串口1接收数据的存放指针指向接收缓存的头部
+			(&huart1)->pRxBuffPtr = pBuf;    // 重新将串口1结构体中的接收缓冲指针指向缓冲数组头部
+			line_flag = 0;  // 串口1接收标志清零
+		}
+		if (line_flag2) {		// 如果串口2接收到一行数据
+			printf("rx2_buff = %s", rx2_buff);       // 打印接收内容到串口1
+			//////////////////////////////
+			// 接收数据处理
+			//////////////////////////////
+			memset(rx2_buff, 0, sizeof(rx2_buff));   // 清空串口2缓存区
+			pBuf2 = rx2_buff;// 重新将串口2接收数据的存放指针指向接收缓存的头部
+			(&huart2)->pRxBuffPtr = pBuf2;    // 重新将串口2结构体中的接收缓冲指针指向缓冲数组头部
+			line_flag2 = 0;  // 串口2接收标志清零
+		}
 	if (rxit_ok != HAL_OK)		// 如果串口1接收中断还没有启动，尝试再次启动
 		rxit_ok = HAL_UART_Receive_IT(&huart1, pBuf, 1);
 	if (mpuok) MPU_getdata();
@@ -656,18 +733,24 @@ void StartDispTask(void const * argument)
 			func_in=0;
 			func_switch=0;
 			page_sta=0;
+			recvtype=0;
+			memset(recv, 0, sizeof(recv));
+			ballx=0;
+			bally=0;
+			playmode=0;
 		}
 		
 		if(func_in&start_sig){
 			switch(func_switch){
 				case 0:Func1(buf);break;
 				case 1:Func2(buf);break;
+				case 2:Func3(buf);break;
 				default:Func1(buf);break;
 		}
 	}
 
 		if(start_sig==0){
-			GUI_DrawBitmap(&bmAvatar_Invert,0,0);
+			GUI_DrawBitmap(&bmAvatar,0,0);
 		}else{
 			GUI_DispStringAt(buf,0,0);
 		}

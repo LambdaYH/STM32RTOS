@@ -43,6 +43,7 @@ stm32rtos\main.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h
 stm32rtos\main.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h
 stm32rtos\main.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/semphr.h
 stm32rtos\main.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h
+stm32rtos\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 stm32rtos\main.o: ..\Drivers\OLED\GUI.h
 stm32rtos\main.o: ..\Drivers\eMPL\MPU6050.h
 stm32rtos\main.o: ..\Drivers\eMPL\inv_mpu.h

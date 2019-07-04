@@ -7,6 +7,7 @@
 "stm32rtos\stm32f1xx_it.o"
 "stm32rtos\stm32f1xx_hal_msp.o"
 "stm32rtos\stm32f1xx_hal_timebase_tim.o"
+"stm32rtos\avatar.o"
 "stm32rtos\stm32f1xx_hal_gpio_ex.o"
 "stm32rtos\stm32f1xx_hal_adc.o"
 "stm32rtos\stm32f1xx_hal_adc_ex.o"
