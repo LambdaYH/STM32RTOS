@@ -81,7 +81,13 @@ int recvtype=0;
 
 int playmode=0;
 int ballx=64;
-int bally=32;
+int bally=32;//陀螺仪控制球
+
+int sendTime =100; //1ms
+int sendTime_switch=0;
+int bSend=0;
+int dataStyle=0;
+int sendCount=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -561,8 +567,28 @@ void Func2(char *buf){
 void Func3(char *buf){
 			GUI_DispStringAt("串口测试", 0, 0);
 			sprintf(buf, "\n%s", recv);
+			if(K1_sta==1) {
+				sendTime_switch++;
+				switch(sendTime_switch){
+					case 0:sendTime=100;break;
+					case 1:sendTime=200;break;
+					case 2:sendTime=500;break;
+					case 3:sendTime=1000;break;
+					default:sendTime_switch=0;sendTime=100;break;
+					}
+				osDelay(300);
+			}
+			if(K3_sta==1) {
+				bSend=!bSend;
+				osDelay(300);
+			}
+			if(K2_sta==1) {
+				dataStyle=!dataStyle;
+			}
+			if(bSend) GUI_DispStringAt("正在发送",70,0);
+			else GUI_DispStringAt("停止发送",70,0);
 			
-}
+		}
 // Function 3 END
 /* USER CODE END 4 */
 
@@ -580,6 +606,7 @@ void StartDefaultTask(void const * argument)
 	HAL_ADCEx_Calibration_Start(&hadc1);
   HAL_ADC_Start_DMA(&hadc1, (uint32_t *)val, 20);
   char buf[100];
+	uint32_t oldtick = 0;
 	mpuok = MPU_init();
 	if (!mpuok)
 		printf("MPU6050 init error!\n");
@@ -622,6 +649,36 @@ void StartDefaultTask(void const * argument)
 	if (rxit_ok != HAL_OK)		// 如果串口1接收中断还没有启动，尝试再次启动
 		rxit_ok = HAL_UART_Receive_IT(&huart1, pBuf, 1);
 	if (mpuok) MPU_getdata();
+	
+	if ((HAL_GetTick() >= oldtick + sendTime) && bSend)
+		{
+			oldtick = HAL_GetTick();
+			if (mpuok)
+			{
+				if (dataStyle)	// 格式化计算后数据帧
+					sprintf(buf, "7MR,%.1f,%.1f,%.1f,%.1f\n", adval * 3.3 / 4096, fAX, fAY, fAZ);
+				else		// 格式化原始数据帧
+					sprintf(buf, "7MY,%d,%d,%d,%d,%d,%d,%d\n", adval, ax, ay, az, gx, gy, gz);
+				// 同时将字符串发送到串口1和串口2
+				printf("%s", buf);	
+				++sendCount;
+			}
+			osDelay(1);
+			
+			// 格式化状态帧
+			sprintf(buf, "7MBD%c%c%c%c%c%c%c%c\n", 
+									(Ledsta & 0x01) ? '1' : '0',
+									(Ledsta & 0x02) ? '1' : '0',
+									(Ledsta & 0x04) ? '1' : '0',
+									(Ledsta & 0x08) ? '1' : '0',
+									(K1_sta) ? 'D' : 'U',
+									(K2_sta) ? 'D' : 'U',
+									(K3_sta) ? 'D' : 'U',
+									(K4_sta) ? 'D' : 'U');
+			printf("%s", buf);		
+			++sendCount;
+		}
+	
 	osDelay(1);
 	}
   /* USER CODE END 5 */ 
