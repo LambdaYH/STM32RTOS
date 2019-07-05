@@ -182,6 +182,25 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle) {
   }
 }
 
+//校验和
+void addChkSum(char *buf,int len){
+	const char TAB[16] = {
+		'0', '1', '2','3','4','5','6','7',
+		'8', '9', 'A','B','C','D','E','F'
+	};
+	int i=0;
+	uint16_t sum =0;
+	for (i=0;i<len;++i){
+		if(buf[i] !='\n'&&buf[i]!=0)
+			sum+=buf[i];
+		else 
+			break;
+	}
+	buf[i]=TAB[(sum&0xFF)>>4];//保留高位右移4个字节
+	buf[i+1]=TAB[sum&0x0F];
+	buf[i+2]='\n';
+	buf[i+3]='\0';
+}
 /* USER CODE END 0 */
 
 /**
@@ -660,6 +679,7 @@ void StartDefaultTask(void const * argument)
 				else		// 格式化原始数据帧
 					sprintf(buf, "7MY,%d,%d,%d,%d,%d,%d,%d\n", adval, ax, ay, az, gx, gy, gz);
 				// 同时将字符串发送到串口1和串口2
+				addChkSum(buf,strlen(buf));
 				printf("%s", buf);	
 				++sendCount;
 			}
@@ -675,6 +695,7 @@ void StartDefaultTask(void const * argument)
 									(K2_sta) ? 'D' : 'U',
 									(K3_sta) ? 'D' : 'U',
 									(K4_sta) ? 'D' : 'U');
+			addChkSum(buf,strlen(buf));
 			printf("%s", buf);		
 			++sendCount;
 		}
