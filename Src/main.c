@@ -769,8 +769,8 @@ void StartDispTask(void const * argument)
   GUI_SetFont(&GUI_FontHZ_SimSun_12);
 	GUI_Clear();
   GUI_DispStringAt("电子系统综合课程设计",5,0);
-	GUI_DispStringAt("16041412",40,20);
-	GUI_DispStringAt("陈逸航",45,40);
+	GUI_DispStringAt("xxxxxxx",40,20);
+	GUI_DispStringAt("xxx",45,40);
 	GUI_Update();
 	HAL_Delay(1000);
 	
